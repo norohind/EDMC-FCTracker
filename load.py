@@ -16,7 +16,7 @@ from typing import Optional
 # contact: a31#6403 (discord), a31@demb.design (email)
 
 
-VERSION = "0.0.6"
+VERSION = "0.0.6-post"
 force_beta = False  # override Plugin_settings.SEND_IN_BETA
 
 
