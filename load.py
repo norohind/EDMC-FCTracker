@@ -381,24 +381,24 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         variable=send_in_beta,
         command=lambda: config.set('FCT_SEND_IN_BETA', send_in_beta.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
-
     row += 1
+
     nb.Checkbutton(
         frame,
         text='Send jump requests',
         variable=send_jump_requests,
         command=lambda: config.set('FCT_SEND_JUMP_REQUESTS', send_jump_requests.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
-
     row += 1
+
     nb.Checkbutton(
         frame,
         text='Send jump canceling',
         variable=send_jump_canceling,
         command=lambda: config.set('FCT_SEND_JUMP_CANCELING', send_jump_canceling.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
-
     row += 1
+
     nb.Checkbutton(
         frame,
         text='Send changes docking permissions',
@@ -406,15 +406,20 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         command=lambda: config.set('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
                                    send_changes_docking_permissions.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
-
     row += 1
+
     nb.Checkbutton(
         frame,
         text='Send changes name',
         variable=send_changes_name,
         command=lambda: config.set('FCT_SEND_CHANGES_NAME', send_changes_name.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
+    row += 1
 
+    nb.Label(
+        frame,
+        text=f"Version: {VERSION}").grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
     return frame
