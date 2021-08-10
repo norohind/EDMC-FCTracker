@@ -416,7 +416,12 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
 
 def prefs_changed(cmdr: str, is_beta: bool) -> None:
     config.set('FCT_DISCORD_WEBHOOK_URLS', [webhook_url.get() for webhook_url in this.webhooks_urls])
-    del this.webhooks_urls
+    try:
+        del this.webhooks_urls
+
+    except NameError:
+        pass
+
     config.save()
 
 
