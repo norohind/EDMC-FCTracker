@@ -329,7 +329,6 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
 
     webhooks_urls = config.get_list('FCT_DISCORD_WEBHOOK_URLS', default=[None for i in range(0, 5)])
     enable_plugin = tk.IntVar(value=config.get_bool('FCT_ENABLE_PLUGIN', default=True))
-    # this.webhook_url = tk.StringVar(value=config.get_str('FCT_DISCORD_WEBHOOK_URL', default=None))
     send_jumps = tk.IntVar(value=config.get_bool('FCT_SEND_JUMPS', default=True))
     send_in_beta = tk.IntVar(value=config.get_bool('FCT_SEND_IN_BETA', default=False))
     send_jump_requests = tk.IntVar(value=config.get_bool('FCT_SEND_JUMP_REQUESTS', default=True))
@@ -354,7 +353,6 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         frame,
         text="Enter your discord webhooks urls here, you can enter up to 5 hooks:").grid(
         row=row, padx=10, pady=(5, 0), columnspan=2, sticky=tk.W)
-    # row += 1
 
     HyperlinkLabel(
         frame,
