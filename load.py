@@ -8,6 +8,7 @@ import sys
 
 from config import appname
 import tkinter as tk
+from tkinter import ttk
 import myNotebook as nb
 from config import config
 from typing import Optional
@@ -20,6 +21,7 @@ from ttkHyperlinkLabel import HyperlinkLabel
 VERSION = "0.0.6-post"
 force_beta = False  # override Plugin_settings.SEND_IN_BETA
 
+DEFAULT_WEBHOOK_NAME_OVERRIDING = '{carrier.name} | {cmdr}'
 
 plugin_name = os.path.basename(os.path.dirname(__file__))
 logger = logging.getLogger(f'{appname}.{plugin_name}')
@@ -224,6 +226,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
         message = Embed()
 
+        if config.get_bool('FCT_OVERRIDE_WEBHOOKS_NAMES', default=False):
+            username = config.get_str('FCT_WEBHOOKS_OVERRIDED_NAME', default=DEFAULT_WEBHOOK_NAME_OVERRIDING)
+            username = username.format(carrier=carrier, cmdr=cmdr)
+            message.set_username(username=username)
+
         if event == "CarrierJumpRequest" and config.get_bool('FCT_SEND_JUMP_REQUESTS', default=True):
             destination_system = entry["SystemName"]
             message.add_item(color=Messages.COLOR_JUMP_REQUEST, title=Messages.TITLE_JUMP_REQUEST)
@@ -326,7 +333,9 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
     send_changes_docking_permissions = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
                                                                        default=True))
     send_changes_name = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_NAME', default=True))
-
+    webhooks_names_overriding = tk.IntVar(value=config.get_bool('FCT_OVERRIDE_WEBHOOKS_NAMES', default=False))
+    this.webhooks_overrided_name = tk.StringVar(value=config.get_str('FCT_WEBHOOKS_OVERRIDED_NAME',
+                                                                     default=DEFAULT_WEBHOOK_NAME_OVERRIDING))
     frame = nb.Frame(parent)
 
     nb.Checkbutton(
@@ -340,8 +349,8 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
     nb.Label(
         frame,
         text="Enter your discord webhooks urls here, you can enter up to 5 hooks:").grid(
-        row=row, padx=10, pady=(5, 0), sticky=tk.W)
-    row += 1
+        row=row, padx=10, pady=(5, 0), columnspan=2, sticky=tk.W)
+    # row += 1
 
     HyperlinkLabel(
         frame,
@@ -349,21 +358,20 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         background=nb.Label().cget('background'),
         url='https://docs.gitlab.com/ee/user/project/integrations/discord_notifications.html#create-webhook',
         underline=True
-    ).grid(row=row, padx=10, pady=(5, 0), sticky=tk.W)
+    ).grid(row=row, padx=10, pady=(5, 0), column=2, sticky=tk.W)
     row += 1
 
     this.webhooks_urls = [tk.StringVar(value=one_url) for one_url in webhooks_urls]
     for i in range(0, 5):
-
         nb.Entry(
             frame,
             textvariable=this.webhooks_urls[i],
             width=115).grid(
-            row=row, padx=10, pady=(0, 5))
+            row=row, padx=10, pady=(0, 5), columnspan=4)
         nb.Label(
             frame,
             text=f'#{i + 1}').grid(
-            row=row, column=1, sticky=tk.E
+            row=row, column=4, sticky=tk.E
         )
         row += 1
 
@@ -372,7 +380,37 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         text='Send jumps',
         variable=send_jumps,
         command=lambda: config.set('FCT_SEND_JUMPS', send_jumps.get())).grid(
-        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+        row=row, column=0, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Checkbutton(
+        frame,
+        text='Send jump requests',
+        variable=send_jump_requests,
+        command=lambda: config.set('FCT_SEND_JUMP_REQUESTS', send_jump_requests.get())).grid(
+        row=row, column=1, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Checkbutton(
+        frame,
+        text='Send jump canceling',
+        variable=send_jump_canceling,
+        command=lambda: config.set('FCT_SEND_JUMP_CANCELING', send_jump_canceling.get())).grid(
+        row=row, column=2, padx=10, pady=(5, 0), sticky=tk.W)
+    row += 1
+
+    nb.Checkbutton(
+        frame,
+        text='Send changes name',
+        variable=send_changes_name,
+        command=lambda: config.set('FCT_SEND_CHANGES_NAME', send_changes_name.get())).grid(
+        row=row, column=0, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Checkbutton(
+        frame,
+        text='Send changes docking permissions',
+        variable=send_changes_docking_permissions,
+        command=lambda: config.set('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
+                                   send_changes_docking_permissions.get())).grid(
+        row=row, column=1, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
     nb.Checkbutton(
@@ -383,52 +421,48 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
-    nb.Checkbutton(
-        frame,
-        text='Send jump requests',
-        variable=send_jump_requests,
-        command=lambda: config.set('FCT_SEND_JUMP_REQUESTS', send_jump_requests.get())).grid(
-        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+    ttk.Separator(frame, orient=tk.HORIZONTAL).grid(padx=10, pady=(5, 5), columnspan=5, sticky=tk.EW, row=row)
     row += 1
 
     nb.Checkbutton(
         frame,
-        text='Send jump canceling',
-        variable=send_jump_canceling,
-        command=lambda: config.set('FCT_SEND_JUMP_CANCELING', send_jump_canceling.get())).grid(
+        text='Webhooks name overriding',
+        variable=webhooks_names_overriding,
+        command=lambda: config.set('FCT_OVERRIDE_WEBHOOKS_NAMES', webhooks_names_overriding.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
-    nb.Checkbutton(
+    nb.Entry(
         frame,
-        text='Send changes docking permissions',
-        variable=send_changes_docking_permissions,
-        command=lambda: config.set('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
-                                   send_changes_docking_permissions.get())).grid(
+        textvariable=this.webhooks_overrided_name,
+        width=35).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Button(
+        frame,
+        text='Reset',
+        command=lambda: this.webhooks_overrided_name.set(DEFAULT_WEBHOOK_NAME_OVERRIDING)).grid(
+        row=row, column=1, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
-    nb.Checkbutton(
-        frame,
-        text='Send changes name',
-        variable=send_changes_name,
-        command=lambda: config.set('FCT_SEND_CHANGES_NAME', send_changes_name.get())).grid(
-        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+    ttk.Separator(frame, orient=tk.HORIZONTAL).grid(padx=10, pady=(10, 0), columnspan=5, sticky=tk.EW, row=row)
     row += 1
 
     nb.Label(
         frame,
         text=f"Version: {VERSION}").grid(
-        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+        row=row, padx=10, pady=(10, 0), sticky=tk.W)
     row += 1
 
     return frame
 
 
 def prefs_changed(cmdr: str, is_beta: bool) -> None:
-    config.set('FCT_DISCORD_WEBHOOK_URLS', [webhook_url.get() for webhook_url in this.webhooks_urls])
+    config.set('FCT_DISCORD_WEBHOOK_URLS', [webhook_url.get() for webhook_url in this.webhooks_urls])  # type: ignore
+    config.set('FCT_WEBHOOKS_OVERRIDED_NAME', this.webhooks_overrided_name.get())  # type: ignore
+
     try:
-        del this.webhooks_urls
+        del this.webhooks_urls  # type: ignore
 
     except NameError:
         pass
