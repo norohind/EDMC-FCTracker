@@ -216,6 +216,10 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         carrier.callsign = entry["Callsign"]
         return
 
+    if carrier.name is None:  # In case edmc was opened when user already has opened Carrier Management window
+        logger.debug('carrier.name is None, reopen Carrier Management')
+        return
+
     if event in [
         "CarrierJumpRequest",
         "CarrierJumpCancelled",
