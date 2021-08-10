@@ -11,6 +11,7 @@ import tkinter as tk
 import myNotebook as nb
 from config import config
 from typing import Optional
+from ttkHyperlinkLabel import HyperlinkLabel
 
 # GPLv3, wrote by a31 aka norohind aka CMDR Aleksey31
 # contact: a31#6403 (discord), a31@demb.design (email)
@@ -327,13 +328,22 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         text="Enable plugin",
         variable=enable_plugin,
         command=lambda: config.set('FCT_ENABLE_PLUGIN', enable_plugin.get())).grid(
-        row=row, padx=10, pady=(10, 0), sticky=tk.W)
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
     nb.Label(
         frame,
-        text="Enter your webhooks urls here, you can enter up to 5 hooks:").grid(
-        row=row, padx=10, pady=(10, 0), sticky=tk.W)
+        text="Enter your discord webhooks urls here, you can enter up to 5 hooks:").grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+    row += 1
+
+    HyperlinkLabel(
+        frame,
+        text='How to get a webhook url',
+        background=nb.Label().cget('background'),
+        url='https://docs.gitlab.com/ee/user/project/integrations/discord_notifications.html#create-webhook',
+        underline=True
+    ).grid(row=row, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
     this.webhooks_urls = [tk.StringVar(value=one_url) for one_url in webhooks_urls]
