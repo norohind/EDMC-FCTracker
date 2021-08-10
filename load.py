@@ -242,14 +242,9 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                 description=Messages.TEXT_JUMP_CANCELLED.format(name=carrier.name))
 
         if event == "CarrierJump" and config.get_bool('FCT_SEND_JUMPS', default=True):
-            # jump on not your own carrier case
             if carrier.callsign != station:
                 # for case when you have your own carrier but now jumping on someone else's one
-                if config.get_bool('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', default=False):
-                    remember_carrier_name = carrier.name
-                    carrier.name = station
-                else:
-                    return
+                return
 
             destination_system = entry["StarSystem"]
 
@@ -272,9 +267,6 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                     new_value=Messages.TEXT_JUMP.format(
                         system=destination_system,
                         name=carrier.name))
-
-            if config.get_bool('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', default=False) and carrier.callsign != station:
-                carrier.name = remember_carrier_name
 
         if event == "CarrierDockingPermission" and \
                 config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS', default=True):
@@ -324,7 +316,6 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
     send_changes_docking_permissions = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
                                                                        default=True))
     send_changes_name = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_NAME', default=True))
-    send_jumps_not_my_own_carrier = tk.IntVar(value=config.get_bool('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', default=False))
 
     frame = nb.Frame(parent)
 
@@ -406,14 +397,7 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
 
     row += 1
-    nb.Checkbutton(
-        frame,
-        text='Send jumps not my own carrier',
-        variable=send_jumps_not_my_own_carrier,
-        command=lambda: config.set('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', send_jumps_not_my_own_carrier.get())).grid(
-        row=row, padx=10, pady=(5, 0), sticky=tk.W)
 
-    row += 1
     return frame
 
 
