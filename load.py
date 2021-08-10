@@ -4,31 +4,29 @@ import requests
 import threading
 import json
 import logging
+import sys
 
 from config import appname
+import tkinter as tk
+import myNotebook as nb
+from config import config
+from typing import Optional
 
 # GPLv3, wrote by a31 aka norohind aka CMDR Aleksey31
-# contact: a31#6403 (discord)
+# contact: a31#6403 (discord), a31@demb.design (email)
 
 
-VERSION = "0.0.5"
+VERSION = "0.0.6"
 force_beta = False  # override Plugin_settings.SEND_IN_BETA
+
 
 plugin_name = os.path.basename(os.path.dirname(__file__))
 logger = logging.getLogger(f'{appname}.{plugin_name}')
 
-
-class Plugin_settings():
-    SEND_IN_BETA = False  # do send messages when play in beta?
-    SEND_JUMP_REQUESTS = True
-    SEND_JUMPS = True
-    SEND_JUMP_CANCELING = True
-    SEND_CHANGES_DOCKING_PERMISSIONS = True
-    SEND_CHANGES_NAME = True
-    SEND_JUMPS_NOT_MY_OWN_CARRIER = True
+this = sys.modules[__name__]  # For holding module globals, thanks to edsm.py
 
 
-class Messages():
+class Messages:
     """Class that contains all using messages text"""
 
     # take color in HEX and turn it into decimal
@@ -63,7 +61,7 @@ class Messages():
     DOC_PERMISSION_DISALLOW_NOTORIUS = "Запрещена"
 
 
-class Carrier():
+class Carrier:
     def __init__(self):
         self.name = None
         self.callsign = None
@@ -72,11 +70,11 @@ class Carrier():
         self.docking_permission = None
         self.allow_notorius = None
         self.owner = None
-        self.store_key = None
 
 
-class Embed():
-    """Building completed and ready for send embed message for discord. Requeries json lib"""
+class Embed:
+    """Building completed and ready for send embed message for discord. Requires json lib"""
+
     def __init__(self, **kwargs):  # color, title, description, username
         self.items = list()
 
@@ -86,7 +84,8 @@ class Embed():
         else:
             self.username = None
 
-        if len(kwargs) == 0:  # we can create new object without creating an item, just do not pass anything (exception is 'username') to constructor
+        if len(kwargs) == 0:  # we can create new object without creating an item, just do not pass anything (
+            # exception is 'username') to constructor
             return
 
         self.add_item(**kwargs)
@@ -123,37 +122,41 @@ class Embed():
 
 
 class Messages_sender(threading.Thread):
-    """Sending message to discord asynchronously, support embeds and content= ways"""
-    def __init__(self, message, url, embeds=True):
+    """Sending embed message to discord "asynchronously" """
+
+    def __init__(self, embed, urls):
         threading.Thread.__init__(self)
-        self.message = message
-        self.url = url
-        self.embeds = embeds
+        self.message = embed
+        self.urls = urls
         self.start()
 
     def run(self):
-        self.message = str(self.message)
-        if not self.embeds:
-            self.message = f"content={self.message}"
-            self.headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+        if isinstance(self.urls, list):
+
+            for url in self.urls:
+
+                if isinstance(url, str):
+
+                    if url.startswith('https://'):
+                        self.send(url)
+                    else:
+                        logger.debug(f'Skipping {url}')
+                else:
+                    logger.warning(f'Unknown url type {type(url)}, {url}')
         else:
-            self.headers = {'Content-Type': 'application/json'}
+            logger.warning(f'Unknown urls type {type(self.urls)}, {self.urls}')
 
-        if isinstance(self.url, str):
-            self.single_url = self.url
-            self.send()
+    def send(self, single_url):
+        headers = {'Content-Type': 'application/json'}
+        try:
+            r = requests.post(single_url, data=self.message.encode('utf-8'), headers=headers)
+            if r.status_code != 204:
+                logger.warning(f"Status code: {r.status_code}!")
+                logger.warning(r.text)
 
-        elif isinstance(self.url, list):
-            for self.single_url in self.url:
-                self.send()
-        else:
-            logger.error(f'Unknown url type {type(self.url)}')
-
-    def send(self):
-        r = requests.post(self.single_url, data=self.message.encode('utf-8'), headers=self.headers)
-        if r.status_code != 204:
-            logger.error(f"Status code: {r.status_code}!")
-            logger.error(r.text)
+        except Exception as e:
+            logger.warning(f'An exception occurred when sending message to {single_url}; {e}')
 
 
 def docking_permission2text(permission):
@@ -176,16 +179,19 @@ def docking_permission4notorius2text(notorius):
 
 
 def plugin_start3(plugin_dir):
-    logger.info(f"Plugin version: {VERSION}")
-    return 'FC dispatcher'
+    logger.info(f"Plugin version: {VERSION}, enabled status: {config.get_bool('FCT_ENABLE_PLUGIN', default=True)}")
+    return 'FC tracker'
 
 
 def journal_entry(cmdr, is_beta, system, station, entry, state):
-    if is_beta and not Plugin_settings.SEND_IN_BETA:
+    if not config.get_bool('FCT_ENABLE_PLUGIN', default=True):
+        return
+
+    if is_beta and not config.get_bool('FCT_SEND_IN_BETA', default=False):
         return
 
     if state["Role"] is not None:  # we don't work while you are multicrew passenger
-        logger.debug(f"returning because multicrew, role: {state['Role']}")
+        logger.debug(f"Returning because multicrew, role: {state['Role']}")
         return
 
     event = entry["event"]
@@ -199,15 +205,16 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         return
 
     if event in [
-            "CarrierJumpRequest",
-            "CarrierJumpCancelled",
-            "CarrierJump",
-            "CarrierDockingPermission",
-            "CarrierNameChange"]:
+        "CarrierJumpRequest",
+        "CarrierJumpCancelled",
+        "CarrierJump",
+        "CarrierDockingPermission",
+        "CarrierNameChange"
+    ]:
 
         message = Embed()
 
-        if event == "CarrierJumpRequest" and Plugin_settings.SEND_JUMP_REQUESTS:
+        if event == "CarrierJumpRequest" and config.get_bool('FCT_SEND_JUMP_REQUESTS', default=True):
             destination_system = entry["SystemName"]
             message.add_item(color=Messages.COLOR_JUMP_REQUEST, title=Messages.TITLE_JUMP_REQUEST)
 
@@ -228,17 +235,17 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                         name=carrier.name,
                         system=destination_system))
 
-        if event == "CarrierJumpCancelled" and Plugin_settings.SEND_JUMP_CANCELING:
+        if event == "CarrierJumpCancelled" and config.get_bool('FCT_SEND_JUMP_CANCELING', default=True):
             message.add_item(
                 color=Messages.COLOR_JUMP_CANCELLED,
                 title=Messages.TITLE_JUMP_CANCELLED,
                 description=Messages.TEXT_JUMP_CANCELLED.format(name=carrier.name))
 
-        if event == "CarrierJump" and Plugin_settings.SEND_JUMPS:
+        if event == "CarrierJump" and config.get_bool('FCT_SEND_JUMPS', default=True):
             # jump on not your own carrier case
             if carrier.callsign != station:
-                # for case when you have your own carrier but now jumping on another one
-                if Plugin_settings.SEND_JUMPS_NOT_MY_OWN_CARRIER:
+                # for case when you have your own carrier but now jumping on someone else's one
+                if config.get_bool('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', default=False):
                     remember_carrier_name = carrier.name
                     carrier.name = station
                 else:
@@ -266,10 +273,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                         system=destination_system,
                         name=carrier.name))
 
-            if Plugin_settings.SEND_JUMPS_NOT_MY_OWN_CARRIER and carrier.callsign != station:
+            if config.get_bool('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', default=False) and carrier.callsign != station:
                 carrier.name = remember_carrier_name
 
-        if event == "CarrierDockingPermission" and Plugin_settings.SEND_CHANGES_DOCKING_PERMISSIONS:
+        if event == "CarrierDockingPermission" and \
+                config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS', default=True):
             new_permission = entry["DockingAccess"]
             new_doc_for_crime = entry["AllowNotorious"]
 
@@ -286,7 +294,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
             carrier.docking_permission = new_permission
             carrier.allow_notorius = new_doc_for_crime
 
-        if event == "CarrierNameChange" and Plugin_settings.SEND_CHANGES_NAME:
+        if event == "CarrierNameChange" and config.get_bool('FCT_SEND_CHANGES_NAME', default=True):
             new_name = entry["Name"]
             message.add_item(
                 title=Messages.TITLE_CHANGE_NAME,
@@ -296,10 +304,123 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                 color=Messages.COLOR_CHANGE_NAME)
             carrier.name = new_name
 
-        if is_beta or force_beta:
+        if is_beta or force_beta:  # TODO: just override is_beta
             message.add_item(title=Messages.TITLE_IN_BETA, description=Messages.TEXT_IN_BETA)
 
-        Messages_sender(message.get_message(), url)  #one Messages_sender instance per message
+        # one Messages_sender instance per message
+        Messages_sender(message.get_message(), config.get_list('FCT_DISCORD_WEBHOOK_URLS', default=None))
+
+
+def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.Frame]:
+    row = 0
+
+    webhooks_urls = config.get_list('FCT_DISCORD_WEBHOOK_URLS', default=[None for i in range(0, 5)])
+    enable_plugin = tk.IntVar(value=config.get_bool('FCT_ENABLE_PLUGIN', default=True))
+    # this.webhook_url = tk.StringVar(value=config.get_str('FCT_DISCORD_WEBHOOK_URL', default=None))
+    send_jumps = tk.IntVar(value=config.get_bool('FCT_SEND_JUMPS', default=True))
+    send_in_beta = tk.IntVar(value=config.get_bool('FCT_SEND_IN_BETA', default=False))
+    send_jump_requests = tk.IntVar(value=config.get_bool('FCT_SEND_JUMP_REQUESTS', default=True))
+    send_jump_canceling = tk.IntVar(value=config.get_bool('FCT_SEND_JUMP_CANCELING', default=True))
+    send_changes_docking_permissions = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
+                                                                       default=True))
+    send_changes_name = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_NAME', default=True))
+    send_jumps_not_my_own_carrier = tk.IntVar(value=config.get_bool('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', default=False))
+
+    frame = nb.Frame(parent)
+
+    nb.Checkbutton(
+        frame,
+        text="Enable plugin",
+        variable=enable_plugin,
+        command=lambda: config.set('FCT_ENABLE_PLUGIN', enable_plugin.get())).grid(
+        row=row, padx=10, pady=(10, 0), sticky=tk.W)
+    row += 1
+
+    nb.Label(
+        frame,
+        text="Enter your webhooks urls here, you can enter up to 5 hooks:").grid(
+        row=row, padx=10, pady=(10, 0), sticky=tk.W)
+    row += 1
+
+    this.webhooks_urls = [tk.StringVar(value=one_url) for one_url in webhooks_urls]
+    for i in range(0, 5):
+
+        nb.Entry(
+            frame,
+            textvariable=this.webhooks_urls[i],
+            width=115).grid(
+            row=row, padx=10, pady=(0, 5))
+        nb.Label(
+            frame,
+            text=f'#{i + 1}').grid(
+            row=row, column=1, sticky=tk.E
+        )
+        row += 1
+
+    nb.Checkbutton(
+        frame,
+        text='Send jumps',
+        variable=send_jumps,
+        command=lambda: config.set('FCT_SEND_JUMPS', send_jumps.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+    row += 1
+
+    nb.Checkbutton(
+        frame,
+        text='Send in beta',
+        variable=send_in_beta,
+        command=lambda: config.set('FCT_SEND_IN_BETA', send_in_beta.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    row += 1
+    nb.Checkbutton(
+        frame,
+        text='Send jump requests',
+        variable=send_jump_requests,
+        command=lambda: config.set('FCT_SEND_JUMP_REQUESTS', send_jump_requests.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    row += 1
+    nb.Checkbutton(
+        frame,
+        text='Send jump canceling',
+        variable=send_jump_canceling,
+        command=lambda: config.set('FCT_SEND_JUMP_CANCELING', send_jump_canceling.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    row += 1
+    nb.Checkbutton(
+        frame,
+        text='Send changes docking permissions',
+        variable=send_changes_docking_permissions,
+        command=lambda: config.set('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
+                                   send_changes_docking_permissions.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    row += 1
+    nb.Checkbutton(
+        frame,
+        text='Send changes name',
+        variable=send_changes_name,
+        command=lambda: config.set('FCT_SEND_CHANGES_NAME', send_changes_name.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    row += 1
+    nb.Checkbutton(
+        frame,
+        text='Send jumps not my own carrier',
+        variable=send_jumps_not_my_own_carrier,
+        command=lambda: config.set('FCT_SEND_JUMPS_NOT_MY_OWN_CARRIER', send_jumps_not_my_own_carrier.get())).grid(
+        row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    row += 1
+    return frame
+
+
+def prefs_changed(cmdr: str, is_beta: bool) -> None:
+    config.set('FCT_DISCORD_WEBHOOK_URLS', [webhook_url.get() for webhook_url in this.webhooks_urls])
+    del this.webhooks_urls
+    config.save()
 
 
 carrier = Carrier()
