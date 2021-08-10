@@ -92,6 +92,8 @@ class Embed:
         self.add_item(**kwargs)
 
     def add_item(self, **kwargs):
+        """Add item to the embed"""
+
         color = kwargs.get('color')
         title = kwargs.get('title')
         description = kwargs.get('description')
@@ -118,8 +120,12 @@ class Embed:
         self.items[item][key] = self.items[item][key] + new_value
 
     def set_username(self, username):
-        """Will override current webhook username, for reset call this func with None"""
+        """Will override current webhook username, for reset, call this func with None"""
         self.username = username
+
+    def set_footer(self, text, icon_url=None, item=0):
+        """Set footer to single embed"""
+        self.items[item].update(footer=dict(text=text, icon_url=icon_url))
 
 
 class Messages_sender(threading.Thread):
