@@ -187,6 +187,9 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
     if not config.get_bool('FCT_ENABLE_PLUGIN', default=True):
         return
 
+    if force_beta:
+        is_beta = True
+
     if is_beta and not config.get_bool('FCT_SEND_IN_BETA', default=False):
         return
 
@@ -296,7 +299,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                 color=Messages.COLOR_CHANGE_NAME)
             carrier.name = new_name
 
-        if is_beta or force_beta:  # TODO: just override is_beta
+        if is_beta:
             message.add_item(title=Messages.TITLE_IN_BETA, description=Messages.TEXT_IN_BETA)
 
         # one Messages_sender instance per message
