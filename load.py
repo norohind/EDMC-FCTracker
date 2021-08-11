@@ -338,6 +338,10 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
             try:
                 destination_body = entry["Body"]
+
+                if destination_system == destination_body:
+                    raise KeyError
+
                 message.update_item(
                     item=0,
                     key="description",
@@ -375,6 +379,10 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
             try:
                 destination_body = entry["Body"]
+
+                if destination_system == destination_body:
+                    raise KeyError
+
                 message.update_item(
                     item=0,
                     key="description",
