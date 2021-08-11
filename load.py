@@ -29,6 +29,77 @@ logger = logging.getLogger(f'{appname}.{plugin_name}')
 this = sys.modules[__name__]  # For holding module globals, thanks to edsm.py
 
 
+class FSSSignals_cache:
+    def __init__(self):
+        self.cache = list()
+        self.limit = 101  # 101 just because
+        self.block = False
+
+    def add_signal(self, signal_entry, system):
+
+        if self.block:
+            return
+
+        if '-' in signal_entry.get('SignalName')[-7:]:  # it's FC, probably
+            self.cache.append(dict(callsign=signal_entry['SignalName'][-7:],
+                                   system=system))
+
+            if len(self.cache) >= self.limit:  # Don't let it become huge
+                self.cache.pop()
+
+    def fc_lookup(self, callsign):
+        logger.debug(f'lookup for {callsign}')
+        for signal in self.cache:
+
+            if signal['callsign'] == callsign:
+
+                self.block = True
+                self.cache = list()
+
+                logger.debug(f'lookup for {callsign} successful: {signal["system"]}')
+                return signal['system']
+
+        return None
+
+
+class Dockings_cache:
+    def __init__(self):
+        self.cache = list()
+        self.limit = 101
+        self.block = False
+
+    def add_docking(self, entry):
+
+        if self.block:
+            return
+
+        event = entry['event']
+
+        if event == 'StartUp' and entry['Docked'] and entry.get('StationType') == 'FleetCarrier':
+            self.cache.append(dict(system=entry['StarSystem'], callsign=entry['StationName']))
+
+        if event == 'Location' and entry['Docked'] is True and entry.get('StationType') == 'FleetCarrier':
+            self.cache.append(dict(system=entry['StarSystem'], callsign=entry['StationName']))
+
+        if event == 'Docked' and entry['StationType'] == 'FleetCarrier':
+            self.cache.append(dict(system=entry['StarSystem'], callsign=entry['StationName']))
+
+        if len(self.cache) >= self.limit:  # Don't let it become huge
+            self.cache.pop()
+
+    def fc_lookup(self, callsign):
+        logger.debug(f'lookup for {callsign}')
+        for signal in self.cache:
+
+            if signal['callsign'] == callsign:
+                self.block = True
+                self.cache = list()
+                logger.debug(f'lookup for {callsign} successful: {signal["system"]}')
+                return signal['system']
+
+        return None
+
+
 class Messages:
     """Class that contains all using messages text"""
 
@@ -49,6 +120,7 @@ class Messages:
     TEXT_JUMP_REQUEST_BODY_DIFF = " к телу {body}"
     TEXT_JUMP_REQUEST = "Запланирован прыжок носителя {name} в систему {system}"
     TEXT_JUMP = "Носитель {name} совершил прыжок в систему {system}"
+    TEXT_JUMP_FROM = " из системы {from_system}"
     TEXT_JUMP_CANCELLED = "Прыжок носителя {name} отменён"
     TEXT_PERMISSION_CHANGE = """Носитель {name} сменил разрешение на стыковку с {old_permission} на {new_permission}
         Стыковка для преступников была {old_doc_for_crime}, сейчас {new_doc_for_crime}"""
@@ -73,6 +145,11 @@ class Carrier:
         self.docking_permission = None
         self.allow_notorius = None
         self.owner = None
+
+
+fsssignals_cache = FSSSignals_cache()
+docks_cache = Dockings_cache()
+carrier = Carrier()
 
 
 class Embed:
@@ -193,6 +270,17 @@ def plugin_start3(plugin_dir):
 
 
 def journal_entry(cmdr, is_beta, system, station, entry, state):
+
+    event = entry["event"]
+
+    if event == 'FSSSignalDiscovered':
+        fsssignals_cache.add_signal(entry, system)
+        return
+
+    if event in ['Location', 'StartUp', 'Docking']:
+        docks_cache.add_docking(entry)
+        return
+
     if not config.get_bool('FCT_ENABLE_PLUGIN', default=True):
         return
 
@@ -206,18 +294,22 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         logger.debug(f"Returning because multicrew, role: {state['Role']}")
         return
 
-    event = entry["event"]
-
     if event == "CarrierStats" and carrier.name is None:
         carrier.name = entry["Name"]
         carrier.cID = entry["CarrierID"]
         carrier.docking_permission = entry["DockingAccess"]
         carrier.allow_notorius = entry["AllowNotorious"]
         carrier.callsign = entry["Callsign"]
-        return
 
-    if carrier.name is None:  # In case edmc was opened when user already has opened Carrier Management window
-        logger.debug('carrier.name is None, reopen Carrier Management')
+        if (location := fsssignals_cache.fc_lookup(carrier.callsign)) is not None:
+            carrier.location = location
+
+        elif (location := docks_cache.fc_lookup(carrier.callsign)) is not None:
+            carrier.location = location
+
+        else:
+            carrier.location = None
+
         return
 
     if event in [
@@ -227,6 +319,10 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         "CarrierDockingPermission",
         "CarrierNameChange"
     ]:
+
+        if carrier.name is None:  # In case edmc was opened when user already has opened Carrier Management window
+            logger.debug('carrier.name is None, reopen Carrier Management')
+            return
 
         message = Embed()
 
@@ -256,6 +352,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                         name=carrier.name,
                         system=destination_system))
 
+            if carrier.location is not None and config.get_bool('FCT_GUESS_FC_LOCATION', default=False):
+                message.concatenate_item(item=0,
+                                         key='description',
+                                         new_value=Messages.TEXT_JUMP_FROM.format(from_system=carrier.location))
+
         if event == "CarrierJumpCancelled" and config.get_bool('FCT_SEND_JUMP_CANCELING', default=True):
             message.add_item(
                 color=Messages.COLOR_JUMP_CANCELLED,
@@ -268,6 +369,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                 return
 
             destination_system = entry["StarSystem"]
+
+            carrier.location = destination_system  # Update carrier.location by carrier jump
 
             message.add_item(color=Messages.COLOR_JUMP, title=Messages.TITLE_JUMP)
 
@@ -288,6 +391,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                     new_value=Messages.TEXT_JUMP.format(
                         system=destination_system,
                         name=carrier.name))
+
+            if carrier.location is not None and config.get_bool('FCT_GUESS_FC_LOCATION', default=False):
+                message.concatenate_item(item=0,
+                                         key='description',
+                                         new_value=Messages.TEXT_JUMP_FROM.format(from_system=carrier.location))
 
         if event == "CarrierDockingPermission" and \
                 config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS', default=True):
@@ -339,6 +447,7 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
     webhooks_names_overriding = tk.IntVar(value=config.get_bool('FCT_OVERRIDE_WEBHOOKS_NAMES', default=False))
     this.webhooks_overrided_name = tk.StringVar(value=config.get_str('FCT_WEBHOOKS_OVERRIDED_NAME',
                                                                      default=DEFAULT_WEBHOOK_NAME_OVERRIDING))
+    guess_fc_location = tk.IntVar(value=config.get_bool('FCT_GUESS_FC_LOCATION', default=False))
     frame = nb.Frame(parent)
 
     nb.Checkbutton(
@@ -421,6 +530,18 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         variable=send_in_beta,
         command=lambda: config.set('FCT_SEND_IN_BETA', send_in_beta.get())).grid(
         row=row, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Checkbutton(
+        frame,
+        text='Guess current FC location',
+        variable=guess_fc_location,
+        command=lambda: config.set('FCT_GUESS_FC_LOCATION', guess_fc_location.get())).grid(
+        row=row, column=1, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Label(
+        frame,
+        text=f'Current guess: {carrier.location}').grid(
+        row=row, column=2, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
     ttk.Separator(frame, orient=tk.HORIZONTAL).grid(padx=10, pady=(5, 5), columnspan=5, sticky=tk.EW, row=row)
@@ -472,4 +593,18 @@ def prefs_changed(cmdr: str, is_beta: bool) -> None:
     config.save()
 
 
-carrier = Carrier()
+def cmdr_data(data, is_beta):
+
+    if not config.get_bool('FCT_ENABLE_PLUGIN', default=True):
+        return
+
+    if force_beta:
+        is_beta = True
+
+    if is_beta and not config.get_bool('FCT_SEND_IN_BETA', default=False):
+        return
+
+    if carrier.callsign is not None:
+        for ship_key in data['ships']:
+            if data['ships'][ship_key]['station']['name'] == carrier.callsign:
+                carrier.location = data['ships'][ship_key]['starsystem']['name']
