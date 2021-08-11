@@ -301,16 +301,17 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         carrier.allow_notorius = entry["AllowNotorious"]
         carrier.callsign = entry["Callsign"]
 
+    if carrier.callsign is not None and carrier.location is None:
         if (location := fsssignals_cache.fc_lookup(carrier.callsign)) is not None:
             carrier.location = location
+            logger.debug(f'Updating FC location according to fss cache: "{carrier.location}"')
 
         elif (location := docks_cache.fc_lookup(carrier.callsign)) is not None:
             carrier.location = location
+            logger.debug(f'Updating FC location according to docks cache: "{carrier.location}"')
 
         else:
             carrier.location = None
-
-        return
 
     if event in [
         "CarrierJumpRequest",
@@ -608,3 +609,4 @@ def cmdr_data(data, is_beta):
         for ship_key in data['ships']:
             if data['ships'][ship_key]['station']['name'] == carrier.callsign:
                 carrier.location = data['ships'][ship_key]['starsystem']['name']
+                logger.debug(f'Updating FC location according to cmdr_data: "{carrier.location}"')
