@@ -609,5 +609,6 @@ def cmdr_data(data, is_beta):
     if carrier.callsign is not None:
         for ship_key in data['ships']:
             if data['ships'][ship_key]['station']['name'] == carrier.callsign:
-                carrier.location = data['ships'][ship_key]['starsystem']['name']
-                logger.debug(f'Updating FC location according to cmdr_data: "{carrier.location}"')
+                new_location = data['ships'][ship_key]['starsystem']['name']
+                logger.debug(f'Updating FC location according to cmdr_data: {carrier.location} -> {new_location}')
+                carrier.location = new_location
