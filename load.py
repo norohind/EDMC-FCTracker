@@ -371,8 +371,6 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 
             destination_system = entry["StarSystem"]
 
-            carrier.location = destination_system  # Update carrier.location by carrier jump
-
             message.add_item(color=Messages.COLOR_JUMP, title=Messages.TITLE_JUMP)
 
             try:
@@ -397,6 +395,9 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                 message.concatenate_item(item=0,
                                          key='description',
                                          new_value=Messages.TEXT_JUMP_FROM.format(from_system=carrier.location))
+
+            logger.debug(f'Updating FC location according to jump event {carrier.location} -> {destination_system}')
+            carrier.location = destination_system  # Update carrier.location by carrier jump
 
         if event == "CarrierDockingPermission" and \
                 config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS', default=True):
