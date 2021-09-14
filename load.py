@@ -48,7 +48,7 @@ class FSSSignals_cache:
                 self.cache.pop()
 
     def fc_lookup(self, callsign):
-        logger.debug(f'lookup for {callsign}')
+        # logger.debug(f'lookup for {callsign}')
         for signal in self.cache:
 
             if signal['callsign'] == callsign:
@@ -56,7 +56,7 @@ class FSSSignals_cache:
                 self.block = True
                 self.cache = list()
 
-                logger.debug(f'lookup for {callsign} successful: {signal["system"]}')
+                # logger.debug(f'lookup for {callsign} successful: {signal["system"]}')
                 return signal['system']
 
         return None
@@ -88,13 +88,13 @@ class Dockings_cache:
             self.cache.pop()
 
     def fc_lookup(self, callsign):
-        logger.debug(f'lookup for {callsign}')
+        # logger.debug(f'lookup for {callsign}')
         for signal in self.cache:
 
             if signal['callsign'] == callsign:
                 self.block = True
                 self.cache = list()
-                logger.debug(f'lookup for {callsign} successful: {signal["system"]}')
+                # logger.debug(f'lookup for {callsign} successful: {signal["system"]}')
                 return signal['system']
 
         return None
@@ -618,5 +618,5 @@ def cmdr_data(data, is_beta):
         for ship_key in data['ships']:
             if data['ships'][ship_key]['station']['name'] == carrier.callsign:
                 new_location = data['ships'][ship_key]['starsystem']['name']
-                logger.debug(f'Updating FC location according to cmdr_data: {carrier.location} -> {new_location}')
+                # logger.debug(f'Updating FC location according to cmdr_data: {carrier.location} -> {new_location}')
                 carrier.location = new_location
