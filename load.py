@@ -227,7 +227,7 @@ class Messages_sender(threading.Thread):
                     if url.startswith('https://'):
                         self.send(url)
                     else:
-                        logger.debug(f'Skipping {url}')
+                        logger.debug(f'Skipping ...{url[-3:]}')
                 else:
                     logger.warning(f'Unknown url type {type(url)}, {url}')
         else:
