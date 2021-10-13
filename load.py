@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
-import os
-import requests
-import threading
 import json
 import logging
+import os
 import sys
-
-from config import appname
+import threading
 import tkinter as tk
 from tkinter import ttk
-import myNotebook as nb
-from config import config
 from typing import Optional
+
+import myNotebook as nb
+import requests
+from config import appname, config
 from ttkHyperlinkLabel import HyperlinkLabel
 
 # GPLv3, wrote by a31 aka norohind aka CMDR Aleksey31
@@ -109,6 +108,7 @@ class Messages:
     COLOR_JUMP = "130816"
     COLOR_PERMISSION_CHANGE = "5261068"
     COLOR_CHANGE_NAME = "9355388"
+    COLOR_DECOMMISSION = "16711685"  # Same for CarrierCancelDecommission
 
     TITLE_JUMP_REQUEST = "Запланирован прыжок"
     TITLE_JUMP = "Прыжок совершён"
@@ -116,6 +116,8 @@ class Messages:
     TITLE_CHANGE_DOCKING_PERMISSION = "Изменение разрешения на стыковку"
     TITLE_IN_BETA = "Бета версия игры"
     TITLE_CHANGE_NAME = "Изменение имени носителя"
+    TITLE_DECOMMISSION = "Списание носителя"
+    TITLE_DECOMMISSION_CANCEL = "Отмена списания носителя"
 
     TEXT_JUMP_REQUEST_BODY_DIFF = " к телу {body}"
     TEXT_JUMP_REQUEST = "Запланирован прыжок носителя {name} в систему {system}"
@@ -126,6 +128,8 @@ class Messages:
         Стыковка для преступников была {old_doc_for_crime}, сейчас {new_doc_for_crime}"""
     TEXT_IN_BETA = "Внимание, данное сообщение относится только к бета версии игры!"
     TEXT_CHANGE_NAME = "Имя носителя изменилось с {old_name} на {new_name}"
+    TEXT_DECOMMISSION = "Начата процедура списания носителя {name}"
+    TEXT_DECOMMISSION_CANCEL = "Процедура списания носителя {name} отменена"
 
     DOC_PERMISSION_ALL = "Для всех"
     DOC_PERMISSION_NONE = "Никто"
@@ -318,7 +322,9 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
         "CarrierJumpCancelled",
         "CarrierJump",
         "CarrierDockingPermission",
-        "CarrierNameChange"
+        "CarrierNameChange",
+        "CarrierDecommission",
+        "CarrierCancelDecommission"
     ]:
 
         if carrier.name is None:  # In case edmc was opened when user already has opened Carrier Management window
@@ -435,6 +441,18 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
                 color=Messages.COLOR_CHANGE_NAME)
             carrier.name = new_name
 
+        if event == "CarrierDecommission" and config.get_bool('FCT_SEND_DECOMMISSION', default=True):
+            message.add_item(
+                title=Messages.TITLE_DECOMMISSION,
+                description=Messages.TEXT_DECOMMISSION.format(name=carrier.name),
+                color=Messages.COLOR_DECOMMISSION)
+
+        if event == "CarrierCancelDecommission" and config.get_bool('FCT_SEND_DECOMMISSION', default=True):
+            message.add_item(
+                title=Messages.TITLE_DECOMMISSION_CANCEL,
+                description=Messages.TEXT_DECOMMISSION_CANCEL.format(name=carrier.name),
+                color=Messages.COLOR_DECOMMISSION)
+
         if is_beta:
             message.add_item(title=Messages.TITLE_IN_BETA, description=Messages.TEXT_IN_BETA)
 
@@ -453,6 +471,7 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
     send_jump_canceling = tk.IntVar(value=config.get_bool('FCT_SEND_JUMP_CANCELING', default=True))
     send_changes_docking_permissions = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
                                                                        default=True))
+    send_decommission = tk.IntVar(value=config.get_bool('FCT_SEND_DECOMMISSION', default=True))
     send_changes_name = tk.IntVar(value=config.get_bool('FCT_SEND_CHANGES_NAME', default=True))
     webhooks_names_overriding = tk.IntVar(value=config.get_bool('FCT_OVERRIDE_WEBHOOKS_NAMES', default=False))
     this.webhooks_overrided_name = tk.StringVar(value=config.get_str('FCT_WEBHOOKS_OVERRIDED_NAME',
@@ -532,6 +551,14 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
         command=lambda: config.set('FCT_SEND_CHANGES_DOCKING_PERMISSIONS',
                                    send_changes_docking_permissions.get())).grid(
         row=row, column=1, padx=10, pady=(5, 0), sticky=tk.W)
+
+    nb.Checkbutton(
+        frame,
+        text='Send decommission/cancel decommission',
+        variable=send_decommission,
+        command=lambda: config.set('FCT_SEND_DECOMMISSION',
+                                   send_decommission.get())).grid(
+        row=row, column=2, padx=10, pady=(5, 0), sticky=tk.W)
     row += 1
 
     nb.Checkbutton(
