@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import functools
 import json
 import logging
 import os
@@ -25,7 +26,18 @@ DEFAULT_WEBHOOK_NAME_OVERRIDING = '{carrier.name} | {cmdr}'
 plugin_name = os.path.basename(os.path.dirname(__file__))
 logger = logging.getLogger(f'{appname}.{plugin_name}')
 
-this = sys.modules[__name__]  # For holding module globals, thanks to edsm.py
+
+class This:
+    """
+    For holding global variables
+    """
+
+    music_flag_1: bool = False
+    webhooks_overrided_name: tk.StringVar
+    webhooks_urls: list[tk.StringVar]
+
+
+this = This()
 
 
 class FSSSignals_cache:
@@ -463,7 +475,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.Frame]:
     row = 0
 
-    webhooks_urls = config.get_list('FCT_DISCORD_WEBHOOK_URLS', default=[None for i in range(0, 5)])
+    webhooks_urls = config.get_list('FCT_DISCORD_WEBHOOK_URLS', default=[None for _ in range(0, 5)])
     enable_plugin = tk.IntVar(value=config.get_bool('FCT_ENABLE_PLUGIN', default=True))
     send_jumps = tk.IntVar(value=config.get_bool('FCT_SEND_JUMPS', default=True))
     send_in_beta = tk.IntVar(value=config.get_bool('FCT_SEND_IN_BETA', default=False))
@@ -618,11 +630,11 @@ def plugin_prefs(parent: nb.Notebook, cmdr: str, is_beta: bool) -> Optional[tk.F
 
 
 def prefs_changed(cmdr: str, is_beta: bool) -> None:
-    config.set('FCT_DISCORD_WEBHOOK_URLS', [webhook_url.get() for webhook_url in this.webhooks_urls])  # type: ignore
-    config.set('FCT_WEBHOOKS_OVERRIDED_NAME', this.webhooks_overrided_name.get())  # type: ignore
+    config.set('FCT_DISCORD_WEBHOOK_URLS', [webhook_url.get() for webhook_url in this.webhooks_urls])
+    config.set('FCT_WEBHOOKS_OVERRIDED_NAME', this.webhooks_overrided_name.get())
 
     try:
-        del this.webhooks_urls  # type: ignore
+        del this.webhooks_urls
 
     except NameError:
         pass
