@@ -285,6 +285,31 @@ def plugin_start3(plugin_dir):
     return 'FC tracker'
 
 
+def journal_entry_decorator(func: callable) -> callable:
+    """
+    The decorator aimed to solve problem with missing CarrierJump event.
+    """
+
+    @functools.wraps(func)
+    def decorated(cmdr, is_beta, system, station, entry, state):
+        event: str = entry['event']
+        if event == 'Music' and entry.get('MusicTrack') == 'NoInGameMusic':
+            this.music_flag_1 = True
+
+        elif event == 'Location' and this.music_flag_1:
+            entry['event'] = 'CarrierJump'
+            this.music_flag_1 = False
+            logger.info(f'Generating synthetic CarrierJump')
+
+        elif event.lower() == 'shutdown' or event in ('Location', 'LoadGame', 'CarrierJump'):
+            this.music_flag_1 = False
+
+        return func(cmdr, is_beta, system, station, entry, state)
+
+    return decorated
+
+
+@journal_entry_decorator
 def journal_entry(cmdr, is_beta, system, station, entry, state):
 
     event = entry["event"]
