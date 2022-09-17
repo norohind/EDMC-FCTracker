@@ -14,7 +14,7 @@ from config import appname, config
 from ttkHyperlinkLabel import HyperlinkLabel
 
 # GPLv3, wrote by a31 aka norohind aka CMDR Aleksey31
-# contact: a31#6403 (discord), a31@demb.design (email)
+# contact: a31#6403 (discord)
 
 
 VERSION = "0.0.6-post"
