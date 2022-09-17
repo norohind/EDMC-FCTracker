@@ -3,7 +3,6 @@ import functools
 import json
 import logging
 import os
-import sys
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -32,7 +31,6 @@ class This:
     For holding global variables
     """
 
-    music_flag_1: bool = False
     webhooks_overrided_name: tk.StringVar
     webhooks_urls: list[tk.StringVar]
 
@@ -290,19 +288,23 @@ def journal_entry_decorator(func: callable) -> callable:
     The decorator aimed to solve problem with missing CarrierJump event.
     """
 
+    music_flag_1 = False
+
     @functools.wraps(func)
     def decorated(cmdr, is_beta, system, station, entry, state):
+        nonlocal music_flag_1
+
         event: str = entry['event']
         if event == 'Music' and entry.get('MusicTrack') == 'NoInGameMusic':
-            this.music_flag_1 = True
+            music_flag_1 = True
 
-        elif event == 'Location' and this.music_flag_1:
+        elif event == 'Location' and music_flag_1:
             entry['event'] = 'CarrierJump'
-            this.music_flag_1 = False
+            music_flag_1 = False
             logger.info(f'Generating synthetic CarrierJump')
 
         elif event.lower() == 'shutdown' or event in ('Location', 'LoadGame', 'CarrierJump'):
-            this.music_flag_1 = False
+            music_flag_1 = False
 
         return func(cmdr, is_beta, system, station, entry, state)
 
