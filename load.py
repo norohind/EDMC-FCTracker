@@ -17,7 +17,7 @@ from ttkHyperlinkLabel import HyperlinkLabel
 # contact: a31#6403 (discord)
 
 
-VERSION = "0.0.6-post"
+VERSION = "1.0"
 force_beta = False  # override Plugin_settings.SEND_IN_BETA
 
 DEFAULT_WEBHOOK_NAME_OVERRIDING = '{carrier.name} | {cmdr}'
